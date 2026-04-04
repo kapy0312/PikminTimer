@@ -400,9 +400,9 @@ export default function App() {
     e.preventDefault();
     if (audioCtx.state === "suspended") audioCtx.resume(); // 解鎖 Audio
 
-    const h = parseInt(form.timeH) || 0;
-    const m = parseInt(form.timeM) || 0;
-    const inputMs = (h * 3600 + m * 60) * 1000;
+    const m = parseInt(form.timeH) || 0; // 欄位1 現在代表分鐘
+    const s = parseInt(form.timeM) || 0; // 欄位2 現在代表秒數
+    const inputMs = (m * 60 + s) * 1000;
 
     const cooldownS =
       form.type === "mushroom"
@@ -645,7 +645,7 @@ export default function App() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="時"
+                  placeholder="分"
                   className="w-1/2 rounded p-2 bg-white/60 border border-white/50 focus:outline-none text-gray-900 placeholder-gray-500 font-bold text-center"
                   value={form.timeH}
                   onChange={(e) => setForm({ ...form, timeH: e.target.value })}
@@ -653,7 +653,7 @@ export default function App() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="分"
+                  placeholder="秒"
                   className="w-1/2 rounded p-2 bg-white/60 border border-white/50 focus:outline-none text-gray-900 placeholder-gray-500 font-bold text-center"
                   value={form.timeM}
                   onChange={(e) => setForm({ ...form, timeM: e.target.value })}
