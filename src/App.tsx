@@ -50,6 +50,11 @@ const playTone = (type: "A" | "B"): Promise<void> => {
   return new Promise((resolve) => {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
+
+    // 在這裡調整音量，0.0 到 1.0 之間
+    // 例如 0.3 代表 30% 音量
+    gain.gain.value = 0.5;
+
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     currentOsc = osc;
