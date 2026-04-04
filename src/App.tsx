@@ -198,16 +198,31 @@ export default function App() {
           ? "bg-green-500"
           : item.state === "blue"
             ? "bg-blue-400"
-            : "bg-red-500";
+            : "bg-red-500 hover:bg-red-600 animate-pulse";
+
+      const emoji = item.type === "mushroom" ? "🍄" : "🌸";
+
+      // [MODIFIED] 核心修改：利用 Tailwind 注入文字標籤
       const icon = L.divIcon({
-        className: "bg-transparent",
-        html: `<div class="w-5 h-5 rounded-full border-2 border-white shadow-md ${color}"></div>`,
+        className: "bg-transparent overflow-visible", // 必須設定 overflow-visible，否則文字會被裁切
+        html: `
+          <div class="relative flex flex-col items-center pointer-events-none">
+            <div class="w-5 h-5 rounded-full border-2 border-white shadow-md ${color}"></div>
+            
+            <div class="absolute top-5 mt-1 px-1.5 py-0.5 text-[11px] font-bold text-gray-800 bg-white/90 backdrop-blur-sm rounded shadow-sm whitespace-nowrap border border-gray-200 z-50">
+              ${emoji} ${item.name}
+            </div>
+          </div>
+        `,
         iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        iconAnchor: [10, 10], // 確保錨點依然維持在圓點正中心
       });
 
       const marker = L.marker([item.lat, item.lng], { icon }).addTo(map);
-      marker.bindTooltip(item.name, { permanent: false, direction: "top" });
+
+      // 既然標籤已經常駐在畫面上，我們不再需要原生的 Tooltip，故將其註解或刪除
+      // marker.bindTooltip(item.name, { permanent: false, direction: "top" });
+
       markersRef.current[item.id] = marker;
     });
   }, [items]);
@@ -335,6 +350,50 @@ export default function App() {
     }
   };
 
+  // 產生並下載 .ics 行事曆檔案
+  const downloadICS = (item: PikminItem) => {
+    // 格式化時間為 ICS 要求的 YYYYMMDDTHHmmssZ (UTC)
+    const formatDate = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    };
+
+    const startTime = new Date(item.targetTime);
+    // 設定事件長度為 5 分鐘
+    const endTime = new Date(item.targetTime + 5 * 60000);
+
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Pikmin Timer//TW",
+      "BEGIN:VEVENT",
+      `UID:${item.id}@pikmintimer`,
+      `DTSTAMP:${formatDate(new Date())}`,
+      `DTSTART:${formatDate(startTime)}`,
+      `DTEND:${formatDate(endTime)}`,
+      `SUMMARY:🛑 Pikmin: ${item.name} (${item.type === "mushroom" ? "香菇" : "巨大的花"}) 時間到！`,
+      `DESCRIPTION:座標: ${item.lat}, ${item.lng}`,
+      "BEGIN:VALARM",
+      "TRIGGER:-PT0M", // 0分鐘前提醒 (準時)
+      "ACTION:DISPLAY",
+      "DESCRIPTION:Pikmin Timer Alarm",
+      "END:VALARM",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const blob = new Blob([icsContent], {
+      type: "text/calendar;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `${item.name}_timer.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Form Handlers
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -355,13 +414,17 @@ export default function App() {
     const cooldownTarget = now + inputMs;
     const target = cooldownTarget + cooldownMs;
 
+    // 將字串座標解析為數字變數，供後續地圖使用
     const [latStr, lngStr] = form.coordinates.split(",").map((s) => s.trim());
+    const targetLat = parseFloat(latStr);
+    const targetLng = parseFloat(lngStr);
+
     const newItem: PikminItem = {
       id: crypto.randomUUID(),
       type: form.type,
       name: form.name,
-      lat: parseFloat(latStr),
-      lng: parseFloat(lngStr),
+      lat: targetLat,
+      lng: targetLng,
       cooldownTargetTime: cooldownTarget,
       targetTime: target,
       state: "green",
@@ -371,6 +434,29 @@ export default function App() {
 
     setItems((prev) => [...prev, newItem]);
     setForm({ ...form, name: "", timeH: "", timeM: "" }); // 座標保留方便連續標記
+
+    // 透過 User-Agent 偵測是否為行動裝置 (排除 PC / Mac)
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent,
+      );
+
+    if (isMobile) {
+      // 僅在手機端觸發行事曆下載
+      downloadICS(newItem);
+    }
+
+    // [NEW] 核心邏輯：控制地圖視角自動平移至新座標
+    if (mapInstance.current) {
+      mapInstance.current.flyTo(
+        [targetLat, targetLng], // 目標座標
+        16, // 目標縮放層級 (Zoom Level: 16 適合檢視單一地標)
+        {
+          animate: true, // 開啟平滑動畫
+          duration: 0.8, // 動畫持續時間 (秒)
+        },
+      );
+    }
   };
 
   const removeItem = useCallback((id: string) => {
