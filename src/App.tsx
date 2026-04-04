@@ -189,6 +189,7 @@ export default function App() {
   useEffect(() => {
     if (!mapInstance.current) return;
     const map = mapInstance.current;
+    mapInstance.current = map; // <--- 增加這行
 
     // 清除舊 Markers
     Object.values(markersRef.current).forEach((marker) =>
@@ -464,6 +465,15 @@ export default function App() {
     }
   };
 
+  const handleFlyTo = (lat: number, lng: number) => {
+    // 改用 mapInstance
+    if (mapInstance.current) {
+      mapInstance.current.flyTo([lat, lng], 18, {
+        duration: 1.5,
+      });
+    }
+  };
+
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }, []);
@@ -701,6 +711,7 @@ export default function App() {
           {items.map((item) => (
             <div
               key={item.id}
+              onClick={() => handleFlyTo(item.lat, item.lng)} // <--- 增加點擊事件
               className={`shrink-0 p-3 rounded-lg border relative overflow-hidden transition-colors ${
                 item.state === "green"
                   ? "bg-green-50/80 border-green-200 shadow-sm"
@@ -714,8 +725,11 @@ export default function App() {
                   {item.type === "mushroom" ? "🍄" : "🌸"} {item.name}
                 </div>
                 <button
-                  onClick={() => removeItem(item.id)}
-                  className="text-red-500 hover:text-red-700 text-sm"
+                  onClick={(e) => {
+                    e.stopPropagation(); // 阻止事件冒泡到父層的 handleFlyTo
+                    removeItem(item.id);
+                  }}
+                  className="text-red-500 hover:text-red-700 text-sm p-1 relative z-10"
                 >
                   ✖
                 </button>
