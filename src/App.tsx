@@ -571,7 +571,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col md:flex-row font-sans bg-[url('https://image-cdn.learnin.tw/bnextmedia/image/album/2026-01/4znk-1767885210.jpg?w=900&output=webp')] bg-cover bg-center overflow-hidden">
+    <div className="h-[100dvh] w-full flex flex-col lg:flex-row font-sans bg-[url('https://image-cdn.learnin.tw/bnextmedia/image/album/2026-01/4znk-1767885210.jpg?w=900&output=webp')] bg-cover bg-center overflow-hidden">
       {/* 警報/靜音列 */}
       {activeAlarm && (
         <div
@@ -587,13 +587,13 @@ export default function App() {
         </div>
       )}
 
-      {/* 地圖區塊 (Mobile: 40vh, Desktop: Flex-1) */}
-      <div className="h-[40vh] md:h-full md:flex-1 relative z-0">
+      {/* 地圖區塊 (Mobile/Tablet: 40vh, Desktop: Flex-1) */}
+      <div className="h-[40vh] lg:h-full lg:flex-1 relative z-0">
         <div ref={mapContainer} className="w-full h-full" />
       </div>
 
       {/* 側邊欄/下方區塊 (Glassmorphism UI) */}
-      <div className="h-[60vh] md:h-full w-full md:w-[400px] flex flex-col bg-white/20 backdrop-blur-md border-t md:border-l border-white/40 shadow-xl relative z-10">
+      <div className="h-[60vh] lg:h-full w-full lg:w-[400px] flex flex-col bg-white/20 backdrop-blur-md border-t lg:border-l border-white/40 shadow-xl relative z-10">
         {/* Header & Settings Button */}
         <div className="px-4 py-0 flex justify-between items-center border-b border-white/20">
           <h1 className="text-lg font-bold text-gray-800 drop-shadow-sm">
