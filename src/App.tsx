@@ -22,6 +22,7 @@ const GAS_URL =
   "https://script.google.com/macros/s/AKfycbzlyLAKNlwTGMUeTx7RY-bCfET8S2h_Ew4Q5KAvbDLb03yMU4HmH3g_-9avjVj2bfA2wg/exec";
 
 const ENABLE_DELETE_USER = false; // 控制是否開放刪除 Sheet 的功能
+const ENABLE_MOBILE_CALENDAR_SYNC = false; // 控制手機端是否自動下載觸發行事曆 (true: 開啟, false: 關閉)
 
 interface PikminItem {
   id: string;
@@ -488,7 +489,8 @@ export default function App() {
         navigator.userAgent,
       );
 
-    if (isMobile) {
+    // 同時判斷是否為行動裝置，且程式碼中的開關為 true
+    if (isMobile && ENABLE_MOBILE_CALENDAR_SYNC) {
       // 僅在手機端觸發行事曆下載
       downloadICS(newItem);
     }
