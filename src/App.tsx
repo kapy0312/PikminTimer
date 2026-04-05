@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
+import timeUpSound from "./assets/TimeUp.mp3"; // 匯入音效檔
 
 // --- Types & Interfaces ---
 type ItemType = "mushroom" | "flower";
@@ -41,6 +42,7 @@ const audioCtx = new (
 )();
 
 let currentOsc: OscillatorNode | null = null;
+let currentAudioElement: HTMLAudioElement | null = null; // 新增 MP3 播放器實例
 let currentTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const playTone = (type: "A" | "B"): Promise<void> => {
@@ -48,24 +50,21 @@ const playTone = (type: "A" | "B"): Promise<void> => {
   if (audioCtx.state === "suspended") audioCtx.resume();
 
   return new Promise((resolve) => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-
-    // 在這裡調整音量，0.0 到 1.0 之間
-    // 例如 0.3 代表 30% 音量
-    gain.gain.value = 0.5;
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    currentOsc = osc;
-
     const cleanup = () => {
       currentOsc = null;
+      currentAudioElement = null;
       resolve();
     };
 
     if (type === "A") {
-      // 輕快提示音 (Blue) - 5秒
+      // 輕快提示音 (Blue) - 5秒，維持使用電子合成音
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0.5;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      currentOsc = osc;
+
       osc.type = "sine";
       osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
       osc.frequency.exponentialRampToValueAtTime(
@@ -78,32 +77,42 @@ const playTone = (type: "A" | "B"): Promise<void> => {
       osc.stop(audioCtx.currentTime + 5);
       currentTimeout = setTimeout(cleanup, 5000);
     } else {
-      // 警報音 (Red) - 20秒
-      osc.type = "square";
-      osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-      // 模擬警報頻率變化
-      for (let i = 0; i < 20; i++) {
-        osc.frequency.setValueAtTime(660, audioCtx.currentTime + i);
-        osc.frequency.setValueAtTime(440, audioCtx.currentTime + i + 0.5);
-      }
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 20);
-      currentTimeout = setTimeout(cleanup, 20000);
+      // 警報音 (Red) - 改用實體 MP3 音效
+      const audio = new Audio(timeUpSound);
+      audio.volume = 0.8; // 設定 MP3 音量 (0.0 ~ 1.0)
+      audio.loop = true; // 設定重複播放直到 20 秒結束或被手動按掉
+      audio.play().catch((e) => console.warn("音效播放被瀏覽器阻擋:", e));
+
+      currentAudioElement = audio;
+
+      // 維持 20 秒後自動關閉的機制
+      currentTimeout = setTimeout(() => {
+        stopAudio();
+        cleanup();
+      }, 20000);
     }
   });
 };
 
 const stopAudio = () => {
+  // 停止電子合成音 (Oscillator)
   if (currentOsc) {
     try {
-      currentOsc.disconnect(); // 先切斷連接，確保立即靜音
-      currentOsc.stop(); // 嘗試停止 (若已預先排定 stop 會報錯，交由 catch 攔截)
+      currentOsc.disconnect();
+      currentOsc.stop();
     } catch (e) {
       // 忽略 InvalidStateError
     }
     currentOsc = null;
   }
+
+  // 停止 MP3 播放 (Audio Element)
+  if (currentAudioElement) {
+    currentAudioElement.pause();
+    currentAudioElement.currentTime = 0;
+    currentAudioElement = null;
+  }
+
   if (currentTimeout) {
     clearTimeout(currentTimeout);
     currentTimeout = null;
