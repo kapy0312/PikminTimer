@@ -44,6 +44,7 @@ const audioCtx = new (
 let currentOsc: OscillatorNode | null = null;
 let currentAudioElement: HTMLAudioElement | null = null; // 新增 MP3 播放器實例
 let currentTimeout: ReturnType<typeof setTimeout> | null = null;
+const preloadedAudio = new Audio(timeUpSound); // [新增] 全域預載實體
 
 const playTone = (type: "A" | "B"): Promise<void> => {
   stopAudio(); // 播放新音效前強制清除舊狀態
@@ -78,11 +79,9 @@ const playTone = (type: "A" | "B"): Promise<void> => {
       currentTimeout = setTimeout(cleanup, 5000);
     } else {
       // 警報音 (Red) - 改用實體 MP3 音效
-      const audio = new Audio(timeUpSound);
-      audio.volume = 0.8; // 設定 MP3 音量 (0.0 ~ 1.0)
-      audio.loop = true; // 設定重複播放直到 20 秒結束或被手動按掉
+      const audio = preloadedAudio; // [修改] 使用已經被解鎖的實體
+      audio.loop = true;
       audio.play().catch((e) => console.warn("音效播放被瀏覽器阻擋:", e));
-
       currentAudioElement = audio;
 
       // 維持 20 秒後自動關閉的機制
@@ -154,11 +153,22 @@ export default function App() {
     id: string;
     type: "A" | "B";
   } | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null); // [NEW] 追蹤被選取的項目
 
   // Refs
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [id: string]: L.Marker }>({});
+
+  // 共用地圖跳轉與選取功能
+  const handleFlyTo = useCallback((id: string, lat: number, lng: number) => {
+    setSelectedItemId(id); // 設定目前選取的項目
+    if (mapInstance.current) {
+      mapInstance.current.flyTo([lat, lng], 18, {
+        duration: 1.5,
+      });
+    }
+  }, []);
 
   // Persistence
   useEffect(() => {
@@ -186,6 +196,7 @@ export default function App() {
         ...prev,
         coordinates: `${e.latlng.lat}, ${e.latlng.lng}`,
       }));
+      setSelectedItemId(null); // 點擊地圖空白處時取消選取
     });
 
     return () => {
@@ -198,7 +209,6 @@ export default function App() {
   useEffect(() => {
     if (!mapInstance.current) return;
     const map = mapInstance.current;
-    mapInstance.current = map; // <--- 增加這行
 
     // 清除舊 Markers
     Object.values(markersRef.current).forEach((marker) =>
@@ -208,6 +218,8 @@ export default function App() {
 
     // 建立新 Markers
     items.forEach((item) => {
+      const isSelected = selectedItemId === item.id;
+
       const color =
         item.state === "green"
           ? "bg-green-500"
@@ -217,30 +229,38 @@ export default function App() {
 
       const emoji = item.type === "mushroom" ? "🍄" : "🌸";
 
-      // [MODIFIED] 核心修改：利用 Tailwind 注入文字標籤
+      // 判斷選取狀態的地圖視覺效果 (光暈、字體顏色與背景)
+      const selectedRing = isSelected ? "ring-4 ring-purple-500 scale-125" : "";
+      const labelStyle = isSelected
+        ? "text-purple-800 border-purple-500 bg-purple-100"
+        : "text-gray-800 bg-white/90 border-gray-200";
+
+      // 核心修改：移除 pointer-events-none 改為 cursor-pointer，並加入選取樣式
       const icon = L.divIcon({
-        className: "bg-transparent overflow-visible", // 必須設定 overflow-visible，否則文字會被裁切
+        className: "bg-transparent overflow-visible",
         html: `
-          <div class="relative flex flex-col items-center pointer-events-none">
-            <div class="w-5 h-5 rounded-full border-2 border-white shadow-md ${color}"></div>
+          <div class="relative flex flex-col items-center cursor-pointer transition-transform ${isSelected ? "scale-110 z-[1000]" : ""}">
+            <div class="w-5 h-5 rounded-full border-2 border-white shadow-md ${color} ${selectedRing} transition-all duration-300"></div>
             
-            <div class="absolute top-5 mt-1 px-1.5 py-0.5 text-[11px] font-bold text-gray-800 bg-white/90 backdrop-blur-sm rounded shadow-sm whitespace-nowrap border border-gray-200 z-50">
+            <div class="absolute top-5 mt-1 px-1.5 py-0.5 text-[11px] font-bold ${labelStyle} backdrop-blur-sm rounded shadow-sm whitespace-nowrap border z-50 transition-colors duration-300">
               ${emoji} ${item.name}
             </div>
           </div>
         `,
         iconSize: [20, 20],
-        iconAnchor: [10, 10], // 確保錨點依然維持在圓點正中心
+        iconAnchor: [10, 10],
       });
 
       const marker = L.marker([item.lat, item.lng], { icon }).addTo(map);
 
-      // 既然標籤已經常駐在畫面上，我們不再需要原生的 Tooltip，故將其註解或刪除
-      // marker.bindTooltip(item.name, { permanent: false, direction: "top" });
+      // 加入點擊事件，讓點擊地圖標記也能觸發選取並跳轉
+      marker.on("click", () => {
+        handleFlyTo(item.id, item.lat, item.lng);
+      });
 
       markersRef.current[item.id] = marker;
     });
-  }, [items]);
+  }, [items, selectedItemId, handleFlyTo]);
 
   // Timer Tick Logic (1s interval)
   useEffect(() => {
@@ -415,6 +435,17 @@ export default function App() {
     e.preventDefault();
     if (audioCtx.state === "suspended") audioCtx.resume(); // 解鎖 Audio
 
+    // [新增] 強制解鎖 HTMLAudioElement
+    preloadedAudio.volume = 0; // 設為靜音
+    preloadedAudio
+      .play()
+      .then(() => {
+        preloadedAudio.pause();
+        preloadedAudio.currentTime = 0;
+        preloadedAudio.volume = 0.8; // 恢復正常音量供後續使用
+      })
+      .catch(() => {});
+
     const m = parseInt(form.timeH) || 0; // 欄位1 現在代表分鐘
     const s = parseInt(form.timeM) || 0; // 欄位2 現在代表秒數
     const inputMs = (m * 60 + s) * 1000;
@@ -449,6 +480,7 @@ export default function App() {
 
     setItems((prev) => [...prev, newItem]);
     setForm({ ...form, name: "", timeH: "", timeM: "" }); // 座標保留方便連續標記
+    setSelectedItemId(newItem.id); // 新增後自動選取
 
     // 透過 User-Agent 偵測是否為行動裝置 (排除 PC / Mac)
     const isMobile =
@@ -461,7 +493,7 @@ export default function App() {
       downloadICS(newItem);
     }
 
-    // [NEW] 核心邏輯：控制地圖視角自動平移至新座標
+    // 核心邏輯：控制地圖視角自動平移至新座標
     if (mapInstance.current) {
       mapInstance.current.flyTo(
         [targetLat, targetLng], // 目標座標
@@ -474,17 +506,9 @@ export default function App() {
     }
   };
 
-  const handleFlyTo = (lat: number, lng: number) => {
-    // 改用 mapInstance
-    if (mapInstance.current) {
-      mapInstance.current.flyTo([lat, lng], 18, {
-        duration: 1.5,
-      });
-    }
-  };
-
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
+    setSelectedItemId((prev) => (prev === id ? null : prev)); // 刪除時若為選取狀態則取消
   }, []);
 
   const handleMute = () => {
@@ -717,45 +741,52 @@ export default function App() {
 
         {/* 倒數清單列表 */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => handleFlyTo(item.lat, item.lng)} // <--- 增加點擊事件
-              className={`shrink-0 p-3 rounded-lg border relative overflow-hidden transition-colors ${
-                item.state === "green"
-                  ? "bg-green-50/80 border-green-200 shadow-sm"
-                  : item.state === "blue"
-                    ? "bg-blue-50/80 border-blue-200 shadow-sm"
-                    : "bg-red-100 border-red-500 border-2 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
-              }`}
-            >
-              <div className="flex justify-between items-start">
-                <div className="font-bold text-gray-800">
-                  {item.type === "mushroom" ? "🍄" : "🌸"} {item.name}
+          {items.map((item) => {
+            const isSelected = selectedItemId === item.id;
+            return (
+              <div
+                key={item.id}
+                onClick={() => handleFlyTo(item.id, item.lat, item.lng)}
+                className={`shrink-0 p-3 rounded-lg border relative overflow-hidden cursor-pointer transition-all duration-300 ${
+                  isSelected
+                    ? "ring-4 ring-purple-400 scale-[1.02] shadow-md z-10 "
+                    : "shadow-sm hover:bg-white/40 "
+                } ${
+                  item.state === "green"
+                    ? "bg-green-50/80 border-green-200"
+                    : item.state === "blue"
+                      ? "bg-blue-50/80 border-blue-200"
+                      : "bg-red-100 border-red-500 border-2 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="font-bold text-gray-800">
+                    {item.type === "mushroom" ? "🍄" : "🌸"} {item.name}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation(); // 阻止事件冒泡到父層的 handleFlyTo
+                      removeItem(item.id);
+                    }}
+                    className="text-red-500 hover:text-red-700 text-sm p-1 relative z-10"
+                  >
+                    ✖
+                  </button>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation(); // 阻止事件冒泡到父層的 handleFlyTo
-                    removeItem(item.id);
-                  }}
-                  className="text-red-500 hover:text-red-700 text-sm p-1 relative z-10"
-                >
-                  ✖
-                </button>
+                <div className="mt-2 text-xl font-mono font-bold text-gray-700 tracking-wider">
+                  {formatCountdown(item.targetTime)}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  狀態:{" "}
+                  {item.state === "green"
+                    ? "一般倒數中"
+                    : item.state === "blue"
+                      ? "進入冷卻期"
+                      : "時間到！"}
+                </div>
               </div>
-              <div className="mt-2 text-xl font-mono font-bold text-gray-700 tracking-wider">
-                {formatCountdown(item.targetTime)}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                狀態:{" "}
-                {item.state === "green"
-                  ? "一般倒數中"
-                  : item.state === "blue"
-                    ? "進入冷卻期"
-                    : "時間到！"}
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {items.length === 0 && (
             <div className="text-center text-gray-500 mt-10">尚無追蹤項目</div>
           )}
