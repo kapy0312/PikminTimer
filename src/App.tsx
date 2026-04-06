@@ -793,6 +793,15 @@ export default function App() {
             <div className="text-center text-gray-500 mt-10">尚無追蹤項目</div>
           )}
         </div>
+
+        {/* 隱藏按鈕：位於側邊欄右下角，寬高各 40px 的透明點擊區塊 */}
+        <div
+          className="absolute bottom-0 right-0 w-10 h-10 opacity-0 cursor-default z-50"
+          onClick={() => {
+            // 在這裡填入你要指定的網址
+            window.open("https://docs.google.com/spreadsheets/d/1LrNzlseg31GZANJphNqD3qZe3Qb3EddLJRggbuyMATA/edit?gid=493071035#gid=493071035", "_blank");
+          }}
+        />
       </div>
 
       {/* 設定 Modal */}
