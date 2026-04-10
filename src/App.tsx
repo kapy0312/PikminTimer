@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import timeUpSound from "./assets/TimeUp.mp3"; // 匯入音效檔
+import packageJson from "../package.json"; // [新增] 引入 package.json 獲取版本號
 
 // --- Types & Interfaces ---
 type ItemType = "mushroom" | "flower";
@@ -38,9 +39,8 @@ interface PikminItem {
 }
 
 // --- Audio Synthesizer ---
-const audioCtx = new (
-  window.AudioContext || (window as any).webkitAudioContext
-)();
+const audioCtx = new (window.AudioContext ||
+  (window as any).webkitAudioContext)();
 
 let currentOsc: OscillatorNode | null = null;
 let currentAudioElement: HTMLAudioElement | null = null; // 新增 MP3 播放器實例
@@ -71,7 +71,7 @@ const playTone = (type: "A" | "B"): Promise<void> => {
       osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
       osc.frequency.exponentialRampToValueAtTime(
         1760,
-        audioCtx.currentTime + 0.5,
+        audioCtx.currentTime + 0.5
       );
       gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
@@ -186,7 +186,7 @@ export default function App() {
 
     mapInstance.current = L.map(mapContainer.current).setView(
       [24.1433, 120.6814],
-      14,
+      14
     );
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
@@ -213,7 +213,7 @@ export default function App() {
 
     // 清除舊 Markers
     Object.values(markersRef.current).forEach((marker) =>
-      map.removeLayer(marker),
+      map.removeLayer(marker)
     );
     markersRef.current = {};
 
@@ -225,8 +225,8 @@ export default function App() {
         item.state === "green"
           ? "bg-green-500"
           : item.state === "blue"
-            ? "bg-blue-400"
-            : "bg-red-500 hover:bg-red-600 animate-pulse";
+          ? "bg-blue-400"
+          : "bg-red-500 hover:bg-red-600 animate-pulse";
 
       const emoji = item.type === "mushroom" ? "🍄" : "🌸";
 
@@ -240,7 +240,9 @@ export default function App() {
       const icon = L.divIcon({
         className: "bg-transparent overflow-visible",
         html: `
-          <div class="relative flex flex-col items-center cursor-pointer transition-transform ${isSelected ? "scale-110 z-[1000]" : ""}">
+          <div class="relative flex flex-col items-center cursor-pointer transition-transform ${
+            isSelected ? "scale-110 z-[1000]" : ""
+          }">
             <div class="w-5 h-5 rounded-full border-2 border-white shadow-md ${color} ${selectedRing} transition-all duration-300"></div>
             
             <div class="absolute top-5 mt-1 px-1.5 py-0.5 text-[11px] font-bold ${labelStyle} backdrop-blur-sm rounded shadow-sm whitespace-nowrap border z-50 transition-colors duration-300">
@@ -303,7 +305,7 @@ export default function App() {
             hasPlayedA: playA,
             hasPlayedB: playB,
           };
-        }),
+        })
       );
     }, 1000);
 
@@ -334,7 +336,9 @@ export default function App() {
     setIsFetchingRecipes(true);
     try {
       const res = await fetch(
-        `${GAS_URL}?action=getRecipes&sheetName=${encodeURIComponent(currentUser)}`,
+        `${GAS_URL}?action=getRecipes&sheetName=${encodeURIComponent(
+          currentUser
+        )}`
       );
       const data = await res.json();
       setRecipes(data);
@@ -406,7 +410,9 @@ export default function App() {
       `DTSTAMP:${formatDate(new Date())}`,
       `DTSTART:${formatDate(startTime)}`,
       `DTEND:${formatDate(endTime)}`,
-      `SUMMARY:🛑 Pikmin: ${item.name} (${item.type === "mushroom" ? "香菇" : "巨大的花"}) 時間到！`,
+      `SUMMARY:🛑 Pikmin: ${item.name} (${
+        item.type === "mushroom" ? "香菇" : "巨大的花"
+      }) 時間到！`,
       `DESCRIPTION:座標: ${item.lat}, ${item.lng}`,
       "BEGIN:VALARM",
       "TRIGGER:-PT0M", // 0分鐘前提醒 (準時)
@@ -486,7 +492,7 @@ export default function App() {
     // 透過 User-Agent 偵測是否為行動裝置 (排除 PC / Mac)
     const isMobile =
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent,
+        navigator.userAgent
       );
 
     // 同時判斷是否為行動裝置，且程式碼中的開關為 true
@@ -503,7 +509,7 @@ export default function App() {
         {
           animate: true, // 開啟平滑動畫
           duration: 0.8, // 動畫持續時間 (秒)
-        },
+        }
       );
     }
   };
@@ -567,7 +573,9 @@ export default function App() {
     const m = Math.floor((absDiff / 1000 / 60) % 60);
     const h = Math.floor(absDiff / 1000 / 3600);
     const sign = isNegative ? "-" : "";
-    return `${sign}${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    return `${sign}${h.toString().padStart(2, "0")}:${m
+      .toString()
+      .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -629,6 +637,7 @@ export default function App() {
 
             <select
               className="flex-1 rounded p-2 bg-white/80 border border-purple-300 focus:outline-none text-sm text-gray-900 font-bold"
+              value="" // <--- 加上這一行：強制選單每次操作後都回到預設空值
               onChange={(e) => {
                 const selected = recipes.find((r) => r.name === e.target.value);
 
@@ -757,8 +766,8 @@ export default function App() {
                   item.state === "green"
                     ? "bg-green-50/80 border-green-200"
                     : item.state === "blue"
-                      ? "bg-blue-50/80 border-blue-200"
-                      : "bg-red-100 border-red-500 border-2 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
+                    ? "bg-blue-50/80 border-blue-200"
+                    : "bg-red-100 border-red-500 border-2 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse"
                 }`}
               >
                 <div className="flex justify-between items-start">
@@ -783,15 +792,27 @@ export default function App() {
                   {item.state === "green"
                     ? "一般倒數中"
                     : item.state === "blue"
-                      ? "進入冷卻期"
-                      : "時間到！"}
+                    ? "進入冷卻期"
+                    : "時間到！"}
                 </div>
               </div>
             );
           })}
           {items.length === 0 && (
-            <div className="text-center text-gray-500 mt-10">尚無追蹤項目</div>
+            <div className="text-center text-black mt-10">尚無追蹤項目</div>
           )}
+        </div>
+
+        {/* 側邊欄底部資訊列 (版本號與作者連結) */}
+        <div className="shrink-0 px-4 py-3 bg-white/10 border-t border-white/20 backdrop-blur-md flex justify-between items-center z-20">
+          <a
+            href="https://portaly.cc/kapy0312"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-purple-700 font-bold drop-shadow-sm transition-all duration-300 hover:scale-[1.02]"
+          >
+            ✨ v{packageJson.version} ‧ Crafted by KapyLai ☕
+          </a>
         </div>
 
         {/* 隱藏按鈕：位於側邊欄右下角，寬高各 40px 的透明點擊區塊 */}
@@ -799,7 +820,10 @@ export default function App() {
           className="absolute bottom-0 right-0 w-10 h-10 opacity-0 cursor-default z-50"
           onClick={() => {
             // 在這裡填入你要指定的網址
-            window.open("https://docs.google.com/spreadsheets/d/1LrNzlseg31GZANJphNqD3qZe3Qb3EddLJRggbuyMATA/edit?gid=493071035#gid=493071035", "_blank");
+            window.open(
+              "https://docs.google.com/spreadsheets/d/1LrNzlseg31GZANJphNqD3qZe3Qb3EddLJRggbuyMATA/edit?gid=493071035#gid=493071035",
+              "_blank"
+            );
           }}
         />
       </div>
@@ -815,7 +839,7 @@ export default function App() {
               🍄 香菇預設冷卻 (預設 270 秒 = 4分30秒)
               <input
                 type="number"
-                className="p-2 border rounded font-normal"
+                className="p-2 border rounded font-normal bg-white text-gray-900"
                 value={settings.mushroomCooldown}
                 onChange={(e) =>
                   setSettings({
@@ -829,7 +853,7 @@ export default function App() {
               🌸 巨大的花冷卻 (預設 3330 秒 = 55分30秒)
               <input
                 type="number"
-                className="p-2 border rounded font-normal"
+                className="p-2 border rounded font-normal bg-white text-gray-900"
                 value={settings.flowerCooldown}
                 onChange={(e) =>
                   setSettings({
@@ -849,7 +873,7 @@ export default function App() {
                 <input
                   type="text"
                   placeholder="輸入新使用者/配方表名稱..."
-                  className="flex-1 p-2 border rounded font-normal text-sm focus:outline-none"
+                  className="p-2 border rounded font-normal bg-white text-gray-900"
                   value={newUserName}
                   onChange={(e) => setNewUserName(e.target.value)}
                 />
