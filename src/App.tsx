@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import timeUpSound from "./assets/TimeUp.mp3"; // 匯入音效檔
-import packageJson from "../package.json"; // [新增] 引入 package.json 獲取版本號
+import bgmSound from "./assets/BGM.mp3"; // [新增] 背景音樂
+import packageJson from "../package.json"; // 引入 package.json 獲取版本號
 
 // --- Types & Interfaces ---
 type ItemType = "mushroom" | "flower";
@@ -46,6 +47,10 @@ let currentOsc: OscillatorNode | null = null;
 let currentAudioElement: HTMLAudioElement | null = null; // 新增 MP3 播放器實例
 let currentTimeout: ReturnType<typeof setTimeout> | null = null;
 const preloadedAudio = new Audio(timeUpSound); // [新增] 全域預載實體
+
+const bgmAudio = new Audio(bgmSound); // [新增] 背景音樂實體
+bgmAudio.loop = true; // 設定無限循環播放
+bgmAudio.volume = 0.2; // 建議音量調小 (0.0 ~ 1.0)，設定 20% 當背景音剛好
 
 const playTone = (type: "A" | "B"): Promise<void> => {
   stopAudio(); // 播放新音效前強制清除舊狀態
@@ -179,6 +184,29 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("pikminSettings", JSON.stringify(settings));
   }, [settings]);
+
+  // [新增] 背景音樂自動播放邏輯 (監聽全域的第一次點擊)
+  useEffect(() => {
+    const startBGM = () => {
+      // 如果音樂還在暫停狀態，就播放它
+      if (bgmAudio.paused) {
+        bgmAudio.play().catch((e) => console.warn("背景音樂播放失敗:", e));
+      }
+      // 成功播放後，立刻移除監聽器，避免後續每次點擊都重複執行
+      document.removeEventListener("click", startBGM);
+      document.removeEventListener("touchstart", startBGM);
+    };
+
+    // 監聽滑鼠點擊與手機觸控
+    document.addEventListener("click", startBGM);
+    document.addEventListener("touchstart", startBGM);
+
+    return () => {
+      // 元件卸載時清除監聽器以防記憶體流失
+      document.removeEventListener("click", startBGM);
+      document.removeEventListener("touchstart", startBGM);
+    };
+  }, []);
 
   // Map Initialization (Taichung Location Default)
   useEffect(() => {
