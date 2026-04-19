@@ -50,7 +50,7 @@ const preloadedAudio = new Audio(timeUpSound); // [新增] 全域預載實體
 
 const bgmAudio = new Audio(bgmSound); // [新增] 背景音樂實體
 bgmAudio.loop = true; // 設定無限循環播放
-bgmAudio.volume = 0.2; // 建議音量調小 (0.0 ~ 1.0)，設定 20% 當背景音剛好
+bgmAudio.volume = 0.0; // 建議音量調小 (0.0 ~ 1.0)，設定 20% 當背景音剛好
 
 const playTone = (type: "A" | "B"): Promise<void> => {
   stopAudio(); // 播放新音效前強制清除舊狀態
