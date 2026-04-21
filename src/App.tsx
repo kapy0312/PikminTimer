@@ -293,53 +293,6 @@ export default function App() {
     });
   }, [items, selectedItemId, handleFlyTo]);
 
-  // Timer Tick Logic (1s interval)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      setItems((prev) =>
-        prev.map((item) => {
-          let newState = item.state;
-          let playA = item.hasPlayedA;
-          let playB = item.hasPlayedB;
-
-          // 判斷狀態
-          if (now >= item.targetTime) {
-            newState = "red";
-          } else if (now >= item.cooldownTargetTime) {
-            newState = "blue";
-          } else {
-            newState = "green";
-          }
-
-          // 觸發音效邏輯
-          if (newState === "blue" && !playA) {
-            playA = true;
-            setActiveAlarm({ id: item.id, type: "A" });
-            playTone("A").then(() => setActiveAlarm(null));
-          } else if (newState === "red" && !playB) {
-            playB = true;
-            setActiveAlarm({ id: item.id, type: "B" });
-            playTone("B").then(() => {
-              // 20秒結束自動刪除
-              removeItem(item.id);
-              setActiveAlarm(null);
-            });
-          }
-
-          return {
-            ...item,
-            state: newState,
-            hasPlayedA: playA,
-            hasPlayedB: playB,
-          };
-        })
-      );
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   // [INSERT] at line X (就在 // Form Handlers 註解之上)
   // Fetch Users (Sheets)
   const loadUsers = useCallback(async () => {
@@ -546,6 +499,54 @@ export default function App() {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setSelectedItemId((prev) => (prev === id ? null : prev)); // 刪除時若為選取狀態則取消
   }, []);
+
+  // 切回分頁時立即補跑，避免後台節流造成音效延遲
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        const now = Date.now();
+        setItems((prev) =>
+          prev.map((item) => {
+            let newState = item.state;
+            let playA = item.hasPlayedA;
+            let playB = item.hasPlayedB;
+
+            if (now >= item.targetTime) {
+              newState = "red";
+            } else if (now >= item.cooldownTargetTime) {
+              newState = "blue";
+            } else {
+              newState = "green";
+            }
+
+            if (newState === "blue" && !playA) {
+              playA = true;
+              setActiveAlarm({ id: item.id, type: "A" });
+              playTone("A").then(() => setActiveAlarm(null));
+            } else if (newState === "red" && !playB) {
+              playB = true;
+              setActiveAlarm({ id: item.id, type: "B" });
+              playTone("B").then(() => {
+                removeItem(item.id);
+                setActiveAlarm(null);
+              });
+            }
+
+            return {
+              ...item,
+              state: newState,
+              hasPlayedA: playA,
+              hasPlayedB: playB,
+            };
+          })
+        );
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [removeItem]);
 
   const handleMute = () => {
     stopAudio();
