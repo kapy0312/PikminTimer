@@ -500,52 +500,60 @@ export default function App() {
     setSelectedItemId((prev) => (prev === id ? null : prev)); // 刪除時若為選取狀態則取消
   }, []);
 
-  // 切回分頁時立即補跑，避免後台節流造成音效延遲
+  // Timer Tick Logic (Web Worker 版本，不受後台節流影響)
+  const workerRef = useRef<Worker | null>(null);
+
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        const now = Date.now();
-        setItems((prev) =>
-          prev.map((item) => {
-            let newState = item.state;
-            let playA = item.hasPlayedA;
-            let playB = item.hasPlayedB;
+    const worker = new Worker(new URL("./timerWorker.ts", import.meta.url), {
+      type: "module",
+    });
+    workerRef.current = worker;
 
-            if (now >= item.targetTime) {
-              newState = "red";
-            } else if (now >= item.cooldownTargetTime) {
-              newState = "blue";
-            } else {
-              newState = "green";
-            }
+    worker.onmessage = (e) => {
+      if (e.data.type !== "TICK") return;
+      const now = e.data.now;
 
-            if (newState === "blue" && !playA) {
-              playA = true;
-              setActiveAlarm({ id: item.id, type: "A" });
-              playTone("A").then(() => setActiveAlarm(null));
-            } else if (newState === "red" && !playB) {
-              playB = true;
-              setActiveAlarm({ id: item.id, type: "B" });
-              playTone("B").then(() => {
-                removeItem(item.id);
-                setActiveAlarm(null);
-              });
-            }
+      setItems((prev) =>
+        prev.map((item) => {
+          let newState = item.state;
+          let playA = item.hasPlayedA;
+          let playB = item.hasPlayedB;
 
-            return {
-              ...item,
-              state: newState,
-              hasPlayedA: playA,
-              hasPlayedB: playB,
-            };
-          })
-        );
-      }
+          if (now >= item.targetTime) {
+            newState = "red";
+          } else if (now >= item.cooldownTargetTime) {
+            newState = "blue";
+          } else {
+            newState = "green";
+          }
+
+          if (newState === "blue" && !playA) {
+            playA = true;
+            setActiveAlarm({ id: item.id, type: "A" });
+            playTone("A").then(() => setActiveAlarm(null));
+          } else if (newState === "red" && !playB) {
+            playB = true;
+            setActiveAlarm({ id: item.id, type: "B" });
+            playTone("B").then(() => {
+              removeItem(item.id);
+              setActiveAlarm(null);
+            });
+          }
+
+          return {
+            ...item,
+            state: newState,
+            hasPlayedA: playA,
+            hasPlayedB: playB,
+          };
+        })
+      );
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+    };
   }, [removeItem]);
 
   const handleMute = () => {
